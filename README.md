@@ -43,3 +43,6 @@ Dude add to this where I'm missing stuff because I 100% am
 - allocate memory based on packet length first then create struct with char length of that size (in bytes)
 **- message struct will have a char message[] variable in the last field, and malloc() used before init
 
+- server on a raspberry pi ?? running sqlite containing usernames and current IP address ? maybe an active status too
+
+
