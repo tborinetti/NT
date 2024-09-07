@@ -17,14 +17,6 @@ Dude add to this where I'm missing stuff because I 100% am
   - receive messages and display on screen with timestamps
   - allow for images? hosted on a server or sent byte by byte (wont be displayable in console, maybe downloaded)
 
-?? send packets with a header detailing message info ( length, time sent, data type ) 
-
-?? packets will be a stream of bytes (first byte an int with message length, second byte a date/unix epoch time)
-
-?? will need to be parsed by the recipient 
-
-
-
 
 ### User interface
 - using win32 API
@@ -36,3 +28,18 @@ Dude add to this where I'm missing stuff because I 100% am
 ### Data storage?
 - hopefully immutable/encrypted files
 - option to save chat ? 
+
+
+***
+
+### IDEAS!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+
+- send packets with a header detailing message info (ex: length, time sent, data type ) will need to be parsed by the recipient 
+
+- packets will be a stream of bytes (first byte an int with message length, second byte a date/unix epoch time)
+
+- use an enum for each message packet (one for incoming message, one for invitation, user logoff)
+
+- allocate memory based on packet length first then create struct with char length of that size (in bytes)
+**- message struct will have a char message[] variable in the last field, and malloc() used before init
+
