@@ -12,9 +12,9 @@
 #define DEFAULT_PORT "4040"
 #define MAX_THREADS "5"
 
-void user_connected();
+void user_connected(SOCKET user_connected);
 
-void main(void)
+int main(void)
 {
     WSADATA wsaData;
     int iResult;
@@ -94,7 +94,7 @@ void main(void)
             WSACleanup();
             return 1;
         }
-        CreateThread(NULL, 0, user_connected, &ClientSocket, 0, NULL);
+        CreateThread(NULL, 0, user_connected, ClientSocket, 0, NULL);
         
         closesocket(ClientSocket);
     }
@@ -111,27 +111,28 @@ void main(void)
 }
 
 
-void user_connected(SOCKET *client_socket)
+void user_connected(SOCKET client_socket)
 {
     int result;
     char recvbuf[DEFAULT_BUFLEN];
     int recvbuflen = DEFAULT_BUFLEN;
     int iSendResult;
+    SOCKET *client = client_socket;
 
     // Receive until the peer shuts down the connection
     do {
 
-        result = recv(client_socket, recvbuf, recvbuflen, 0);
+        result = recv(client, recvbuf, recvbuflen, 0);
         if (result > 0) {
             printf("Bytes received: %d\n", result);
 
             // Echo the buffer back to the sender
-            iSendResult = send(client_socket, recvbuf, result, 0);
+            iSendResult = send(client, recvbuf, result, 0);
             if (iSendResult == SOCKET_ERROR) {
                 printf("send failed with error: %d\n", WSAGetLastError());
-                closesocket(client_socket);
+                closesocket(client);
                 WSACleanup();
-                return 1;
+                return;
             }
             printf("Bytes sent: %d\n", iSendResult);
         }
@@ -139,19 +140,19 @@ void user_connected(SOCKET *client_socket)
             printf("Waiting for data\n");
         else {
             printf("User disconnected: %d\n", WSAGetLastError());
-            closesocket(client_socket);
+            closesocket(client);
             WSACleanup();
-            return 1;
+            return;
         }
 
     } while (result >= 0);
 
     // shutdown the connection since we're done
-    result = shutdown(client_socket, SD_SEND);
+    result = shutdown(client, SD_SEND);
     if (result == SOCKET_ERROR) {
         printf("shutdown failed with error: %d\n", WSAGetLastError());
-        closesocket(client_socket);
+        closesocket(client);
         WSACleanup();
-        return 1;
+        return;
     }
 }
