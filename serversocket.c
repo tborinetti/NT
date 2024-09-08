@@ -96,7 +96,7 @@ int main(void)
         }
         CreateThread(NULL, 0, user_connected, ClientSocket, 0, NULL);
         
-        closesocket(ClientSocket);
+        
     }
 
 
