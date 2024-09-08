@@ -135,7 +135,7 @@ void user_connected(SOCKET client_socket)
     getpeername(client_socket, &name, &namelen);
     WSAAddressToStringW(&name, namelen, NULL, &sendbuf, sendbuflen);
 
-    sprintf(sendbuf, sendbuflen, "Connected with address: %s\n", addrbuf);
+    snprintf(sendbuf, sendbuflen, "Connected with address: %s\n", addrbuf);
 
     // Receive until the peer shuts down the connection
     do {
