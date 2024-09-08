@@ -10,9 +10,10 @@
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "4040"
-#define MAX_THREADS "5"
+#define MAX_THREADS 1
 
 DWORD WINAPI user_connected(LPVOID lpParam);
+void print_sock_addr(SOCKET s, struct sockaddr addr, int addrlen);
 
 int main(void)
 {
@@ -20,10 +21,7 @@ int main(void)
     int iResult;
     int thread_size;
 
-
-
     SOCKET ListenSocket = INVALID_SOCKET;
-
 
     struct addrinfo *result = NULL;
     struct addrinfo hints;
@@ -85,9 +83,12 @@ int main(void)
     while (1)
     {
         SOCKET ClientSocket = INVALID_SOCKET;
-        // Accept a client socket
-        ClientSocket = accept(ListenSocket, NULL, NULL);
+        struct sockaddr addr;
+        int addrlen = (int)sizeof(addr);
 
+        // Accept a client socket
+        ClientSocket = accept(ListenSocket, &addr, &addrlen);
+        print_sock_addr(ClientSocket, &addr, &addrlen);
         // If client socket already connected dont create a new thread
 
         if (ClientSocket == INVALID_SOCKET) {
@@ -195,4 +196,32 @@ DWORD WINAPI user_connected(LPVOID lpParam)
         WSACleanup();
         return 1; 
     }
+}
+
+
+void print_sock_addr(SOCKET s, struct sockaddr addr, int addrlen) {
+    struct sockaddr name;
+    int namelen = (int)sizeof(name);
+    char addrbuf[DEFAULT_BUFLEN];
+    int addrbuflen = DEFAULT_BUFLEN;
+    int result;
+
+    result = getpeername(s, &name, &namelen);
+    if (result == SOCKET_ERROR)
+    {
+        printf("peername failed with error: %d\n", WSAGetLastError());
+        closesocket(s);
+        WSACleanup();
+        return 1;
+    }
+
+    result = WSAAddressToStringW(&name, namelen, NULL, &addrbuf, addrbuflen);
+    if (result == SOCKET_ERROR)
+    {
+        printf("string formatting failed with error: %d\n", WSAGetLastError());
+        closesocket(s);
+        WSACleanup();
+        return 1;
+    }
+    printf("Address is: %s", addrbuf);
 }
