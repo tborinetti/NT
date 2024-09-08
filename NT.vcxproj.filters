@@ -15,10 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="clientsocket.c">
+    <ClCompile Include="serversocket.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="serversocket.c">
+    <ClCompile Include="clientsocket.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

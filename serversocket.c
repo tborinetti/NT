@@ -117,20 +117,20 @@ void user_connected(SOCKET client_socket)
     char recvbuf[DEFAULT_BUFLEN];
     int recvbuflen = DEFAULT_BUFLEN;
     int iSendResult;
-    SOCKET *client = client_socket;
+    SOCKET *client = &client_socket;
 
     // Receive until the peer shuts down the connection
     do {
 
-        result = recv(client, recvbuf, recvbuflen, 0);
+        result = recv(*client, recvbuf, recvbuflen, 0);
         if (result > 0) {
             printf("Bytes received: %d\n", result);
 
             // Echo the buffer back to the sender
-            iSendResult = send(client, recvbuf, result, 0);
+            iSendResult = send(*client, recvbuf, result, 0);
             if (iSendResult == SOCKET_ERROR) {
                 printf("send failed with error: %d\n", WSAGetLastError());
-                closesocket(client);
+                closesocket(*client);
                 WSACleanup();
                 return;
             }
@@ -140,7 +140,7 @@ void user_connected(SOCKET client_socket)
             printf("Waiting for data\n");
         else {
             printf("User disconnected: %d\n", WSAGetLastError());
-            closesocket(client);
+            closesocket(*client);
             WSACleanup();
             return;
         }
@@ -148,10 +148,10 @@ void user_connected(SOCKET client_socket)
     } while (result >= 0);
 
     // shutdown the connection since we're done
-    result = shutdown(client, SD_SEND);
+    result = shutdown(*client, SD_SEND);
     if (result == SOCKET_ERROR) {
         printf("shutdown failed with error: %d\n", WSAGetLastError());
-        closesocket(client);
+        closesocket(*client);
         WSACleanup();
         return;
     }
