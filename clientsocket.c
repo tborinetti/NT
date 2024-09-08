@@ -85,7 +85,9 @@ int __cdecl main(int argc, char **argv)
         return 1;
     }
 
-    server_connected(ServerConnectSocket);
+    while (1) {
+        server_connected(ServerConnectSocket);
+    }
 
     return 0;
 }
@@ -109,11 +111,28 @@ void server_connected(SOCKET server_socket)
     struct sockaddr name;
     int namelen = (int)sizeof(name);
 
-    getpeername(server_socket, &name, &namelen);
-    WSAAddressToStringW(&name, namelen, NULL, &sendbuf, sendbuflen);
+    result = getpeername(server_socket, &name, &namelen);
+    if (result == SOCKET_ERROR)
+    {
+        printf("peername failed with error: %d\n", WSAGetLastError());
+        closesocket(*server);
+        WSACleanup();
+        return;
+    }
+    result = WSAAddressToStringW(&name, namelen, NULL, &addrbuf, addrbuflen);
+    if (result == SOCKET_ERROR)
+    {
+        printf("string formatting failed with error: %d\n", WSAGetLastError());
+        closesocket(*server);
+        WSACleanup();
+        return;
+    }
 
-    snprintf(sendbuf, sendbuflen, "Connected with address: %s\n", addrbuf);
-    
+    result = snprintf(sendbuf, sendbuflen, "Connected with address: %s\n", addrbuf);
+    if (result < 0) printf("error printing string");
+
+
+    printf("Server connected %s\n", sendbuf);
     // Send an initial buffer
     result = send(*server, joinmsg, (int)strlen(joinmsg), 0);
     if (result == SOCKET_ERROR) {

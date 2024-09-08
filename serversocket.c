@@ -131,11 +131,26 @@ void user_connected(SOCKET client_socket)
     struct sockaddr name;
     int namelen = (int)sizeof(name);
 
+    result = getpeername(client_socket, &name, &namelen);
+    if (result == SOCKET_ERROR)
+    {
+        printf("peername failed with error: %d\n", WSAGetLastError());
+        closesocket(*client);
+        WSACleanup();
+        return;
+    }
 
-    getpeername(client_socket, &name, &namelen);
-    WSAAddressToStringW(&name, namelen, NULL, &sendbuf, sendbuflen);
+    result = WSAAddressToStringW(&name, namelen, NULL, &addrbuf, addrbuflen);
+    if (result == SOCKET_ERROR)
+    {
+        printf("string formatting failed with error: %d\n", WSAGetLastError());
+        closesocket(*client);
+        WSACleanup();
+        return;
+    }
 
-    snprintf(sendbuf, sendbuflen, "Connected with address: %s\n", addrbuf);
+    result = snprintf(sendbuf, sendbuflen, "Connected with address: %s\n", addrbuf);
+    if (result < 0) printf("error printing string");
 
     // Receive until the peer shuts down the connection
     do {
