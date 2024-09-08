@@ -109,13 +109,17 @@ int __cdecl main(int argc, char **argv)
 
         iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
         if (iResult > 0)
+        {
             printf("Bytes received: %d\n", iResult);
+            printf("Data: %s", recvbuf);
+        }
+       
         else if (iResult == 0)
-            printf("Connection closed\n");
+            printf("Waiting for data\n");
         else
-            printf("recv failed with error: %d\n", WSAGetLastError());
+            printf("Disconnected from server: %d\n", WSAGetLastError());
 
-    } while (iResult > 0);
+    } while (iResult >= 0);
 
     // cleanup
     closesocket(ConnectSocket);
