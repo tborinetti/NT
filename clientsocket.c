@@ -85,6 +85,7 @@ int __cdecl main(int argc, char **argv)
         return 1;
     }
 
+    server_connected(ServerConnectSocket);
 
     return 0;
 }
