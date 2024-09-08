@@ -12,7 +12,7 @@
 #define DEFAULT_PORT "4040"
 #define MAX_THREADS "5"
 
-void user_connected(SOCKET user_connected);
+DWORD WINAPI user_connected(LPVOID lpParam);
 
 int main(void)
 {
@@ -96,8 +96,13 @@ int main(void)
             WSACleanup();
             return 1;
         }
-        CreateThread(NULL, 0, user_connected, ClientSocket, 0, NULL);
-        
+        HANDLE new_thread = CreateThread(NULL, 0, user_connected, ClientSocket, 0, NULL);
+        if (new_thread == INVALID_HANDLE_VALUE) {
+            printf("Error creating thread.\n");
+        }
+        else {
+            printf("Thread created.\n");
+        }
         
     }
 
@@ -113,9 +118,10 @@ int main(void)
 }
 
 
-void user_connected(SOCKET client_socket)
+DWORD WINAPI user_connected(LPVOID lpParam)
 {
-    SOCKET *client = &client_socket;
+    
+    SOCKET *client = (SOCKET *)lpParam;
     int result;
 
     char sendbuf[DEFAULT_BUFLEN];
@@ -131,13 +137,13 @@ void user_connected(SOCKET client_socket)
     struct sockaddr name;
     int namelen = (int)sizeof(name);
 
-    result = getpeername(client_socket, &name, &namelen);
+    result = getpeername(*client, &name, &namelen);
     if (result == SOCKET_ERROR)
     {
         printf("peername failed with error: %d\n", WSAGetLastError());
         closesocket(*client);
         WSACleanup();
-        return;
+        return 1;
     }
 
     result = WSAAddressToStringW(&name, namelen, NULL, &addrbuf, addrbuflen);
@@ -146,7 +152,7 @@ void user_connected(SOCKET client_socket)
         printf("string formatting failed with error: %d\n", WSAGetLastError());
         closesocket(*client);
         WSACleanup();
-        return;
+        return 1;
     }
 
     result = snprintf(sendbuf, sendbuflen, "Connected with address: %s\n", addrbuf);
@@ -165,7 +171,7 @@ void user_connected(SOCKET client_socket)
                 printf("send failed with error: %d\n", WSAGetLastError());
                 closesocket(*client);
                 WSACleanup();
-                return;
+                return 1;
             }
             printf("Bytes sent: %d\n", sendresult);
         }
@@ -176,7 +182,7 @@ void user_connected(SOCKET client_socket)
             printf("User disconnected: %d\n", WSAGetLastError());
             closesocket(*client);
             WSACleanup();
-            return;
+            return 1;
         }
 
     } while (result >= 0);
@@ -187,6 +193,6 @@ void user_connected(SOCKET client_socket)
         printf("shutdown failed with error: %d\n", WSAGetLastError());
         closesocket(*client);
         WSACleanup();
-        return;
+        return 1; 
     }
 }
