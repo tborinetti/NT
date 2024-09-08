@@ -14,19 +14,19 @@
 
 
 #define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT "4040"
+#define DEFAULT_SERVER_PORT "4040"
+
+void server_connected(SOCKET server_socket);
+
 
 int __cdecl main(int argc, char **argv)
 {
     WSADATA wsaData;
-    SOCKET ConnectSocket = INVALID_SOCKET;
+    SOCKET ServerConnectSocket = INVALID_SOCKET;
     struct addrinfo *result = NULL,
         *ptr = NULL,
         hints;
-    const char *sendbuf = "this is a test";
-    char recvbuf[DEFAULT_BUFLEN];
     int iResult;
-    int recvbuflen = DEFAULT_BUFLEN;
 
     // Validate the parameters
     if (argc != 2) {
@@ -47,7 +47,7 @@ int __cdecl main(int argc, char **argv)
     hints.ai_protocol = IPPROTO_TCP;
 
     // Resolve the server address and port
-    iResult = getaddrinfo(argv[1], DEFAULT_PORT, &hints, &result);
+    iResult = getaddrinfo(argv[1], DEFAULT_SERVER_PORT, &hints, &result);
     if (iResult != 0) {
         printf("getaddrinfo failed with error: %d\n", iResult);
         WSACleanup();
@@ -55,22 +55,23 @@ int __cdecl main(int argc, char **argv)
     }
 
     // Attempt to connect to an address until one succeeds
-    for (ptr = result; ptr != NULL;ptr = ptr->ai_next) {
+    for (ptr = result; ptr != NULL;ptr = ptr->ai_next) 
+    {
 
         // Create a SOCKET for connecting to server
-        ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype,
+        ServerConnectSocket = socket(ptr->ai_family, ptr->ai_socktype,
             ptr->ai_protocol);
-        if (ConnectSocket == INVALID_SOCKET) {
+        if (ServerConnectSocket == INVALID_SOCKET) {
             printf("socket failed with error: %ld\n", WSAGetLastError());
             WSACleanup();
             return 1;
         }
 
         // Connect to server.
-        iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
+        iResult = connect(ServerConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
         if (iResult == SOCKET_ERROR) {
-            closesocket(ConnectSocket);
-            ConnectSocket = INVALID_SOCKET;
+            closesocket(ServerConnectSocket);
+            ServerConnectSocket = INVALID_SOCKET;
             continue;
         }
         break;
@@ -78,52 +79,82 @@ int __cdecl main(int argc, char **argv)
 
     freeaddrinfo(result);
 
-    if (ConnectSocket == INVALID_SOCKET) {
+    if (ServerConnectSocket == INVALID_SOCKET) {
         printf("Unable to connect to server!\n");
         WSACleanup();
         return 1;
     }
 
+
+    return 0;
+}
+
+
+void server_connected(SOCKET server_socket) 
+{
+    SOCKET *server = &server_socket;
+    int result;
+
+    char sendbuf[DEFAULT_BUFLEN];
+    int sendbuflen = DEFAULT_BUFLEN;
+    char recvbuf[DEFAULT_BUFLEN];
+    int recvbuflen = DEFAULT_BUFLEN;
+    char addrbuf[DEFAULT_BUFLEN];
+    int addrbuflen = DEFAULT_BUFLEN;
+
+    int sendresult;
+    char *joinmsg = "User connected\n";
+
+    struct sockaddr name;
+    int namelen = (int)sizeof(name);
+
+    getpeername(server_socket, &name, &namelen);
+    WSAAddressToStringW(&name, namelen, NULL, &sendbuf, sendbuflen);
+
+    snprintf(sendbuf, sendbuflen, "Connected with address: %s\n", addrbuf);
+    
     // Send an initial buffer
-    iResult = send(ConnectSocket, sendbuf, (int)strlen(sendbuf), 0);
-    if (iResult == SOCKET_ERROR) {
+    result = send(*server, joinmsg, (int)strlen(joinmsg), 0);
+    if (result == SOCKET_ERROR) {
         printf("send failed with error: %d\n", WSAGetLastError());
-        closesocket(ConnectSocket);
+        closesocket(*server);
         WSACleanup();
-        return 1;
+        return;
     }
+    printf("Bytes Sent: %ld\n", result);
 
-    printf("Bytes Sent: %ld\n", iResult);
-
-    // shutdown the connection since no more data will be sent
-    iResult = shutdown(ConnectSocket, SD_SEND);
-    if (iResult == SOCKET_ERROR) {
-        printf("shutdown failed with error: %d\n", WSAGetLastError());
-        closesocket(ConnectSocket);
-        WSACleanup();
-        return 1;
-    }
-
-    // Receive until the peer closes the connection
     do {
 
-        iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
-        if (iResult > 0)
+        result = recv(*server, recvbuf, recvbuflen, 0);
+        if (result > 0)
         {
-            printf("Bytes received: %d\n", iResult);
+            printf("Bytes received: %d\n", result);
             printf("Data: %s", recvbuf);
+            sendresult = send(*server, sendbuf, sendbuflen, 0);
+            if (sendresult == SOCKET_ERROR) {
+                printf("send failed with error: %d\n", WSAGetLastError());
+                closesocket(*server);
+                WSACleanup();
+                return;
+            }
         }
-       
-        else if (iResult == 0)
+
+        else if (result == 0)
             printf("Waiting for data\n");
         else
             printf("Disconnected from server: %d\n", WSAGetLastError());
 
-    } while (iResult >= 0);
+    } while (result >= 0);
 
+    // shutdown the connection since no more data will be sent
+    result = shutdown(*server, SD_SEND);
+    if (result == SOCKET_ERROR) {
+        printf("shutdown failed with error: %d\n", WSAGetLastError());
+        closesocket(*server);
+        WSACleanup();
+        return;
+    }
     // cleanup
-    closesocket(ConnectSocket);
+    closesocket(*server);
     WSACleanup();
-
-    return 0;
 }
