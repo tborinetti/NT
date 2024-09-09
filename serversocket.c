@@ -23,8 +23,6 @@ typedef struct UserSocket {
     int sendbuflen;
     char recvbuf[DEFAULT_BUFLEN];
     int recvbuflen;
-    char addrbuf[15];
-    int addrbuflen;
     int threadId;
 } USERSOCKET, *PUSERSOCKET;
 
@@ -48,9 +46,9 @@ int main(void)
     }
 
     ZeroMemory(&hints, sizeof(hints));
-    hints.ai_family = AF_INET;
+    hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
+    hints.ai_protocol = 0;
     hints.ai_flags = AI_PASSIVE;
 
     // Resolve the server address and port
@@ -95,7 +93,7 @@ int main(void)
     for(currentUser; currentUser < MAX_USERS;)
     {
         SOCKET ClientSocket = INVALID_SOCKET;
-        struct sockaddr addr;
+        SOCKADDR_STORAGE addr;
         int addrlen = (int)sizeof(addr);
 
         // Accept a client socket
@@ -121,7 +119,6 @@ int main(void)
 
         usersArray[currentUser]->client = ClientSocket;
         usersArray[currentUser]->threadId = currentUser;
-        usersArray[currentUser]->addrbuflen = sizeof(usersArray[currentUser]->addrbuf);
         usersArray[currentUser]->sendbuflen = sizeof(usersArray[currentUser]->sendbuf);
         usersArray[currentUser]->recvbuflen = sizeof(usersArray[currentUser]->recvbuf);
 
@@ -161,11 +158,11 @@ int main(void)
 DWORD WINAPI user_connected(LPVOID lpParam)
 {
     PUSERSOCKET pclient = (PUSERSOCKET)lpParam;
-    SOCKET *client = & pclient->client;
+    SOCKET client = pclient->client;
     char *psendbuf = pclient->sendbuf;
-    int *psendbuflen = pclient->sendbuflen;
+    int psendbuflen = pclient->sendbuflen;
     char *precvbuf = pclient->recvbuflen;
-    int *precvbuflen = pclient->recvbuflen;
+    int precvbuflen = pclient->recvbuflen;
     int threadId = pclient->threadId;
 
     int result;
@@ -175,7 +172,7 @@ DWORD WINAPI user_connected(LPVOID lpParam)
     int namelen = (int)sizeof(name);
 
 
-    result = getpeername(*client, &name, &namelen);
+    /*result = getpeername(*client, &name, &namelen);
     if (result == SOCKET_ERROR)
     {
         printf("peername failed with error: %d\n", WSAGetLastError());
@@ -194,20 +191,20 @@ DWORD WINAPI user_connected(LPVOID lpParam)
     }
 
     result = snprintf(psendbuf, *psendbuflen, "Connected with address: %s\n", pclient->addrbuf);
-    if (result < 0) printf("error printing string");
+    if (result < 0) printf("error printing string");*/
 
     // Receive until the peer shuts down the connection
     do {
 
-        result = recv(*client, precvbuf, *precvbuflen, 0);
+        result = recv(client, precvbuf, precvbuflen, 0);
         if (result > 0) {
             printf("Bytes received: %d\n", result);
 
             // Echo the buffer back to the sender
-            sendresult = send(*client, precvbuf, result, 0);
+            sendresult = send(client, psendbuf, psendbuflen, 0);
             if (sendresult == SOCKET_ERROR) {
                 printf("send failed with error: %d\n", WSAGetLastError());
-                closesocket(*client);
+                closesocket(client);
                 WSACleanup();
                 break;
             }
@@ -217,8 +214,8 @@ DWORD WINAPI user_connected(LPVOID lpParam)
             //printf("Waiting for data\n");
             ;
         else {
-            printf("User disconnected: %d\n", WSAGetLastError());
-            closesocket(*client);
+            printf("User disconnected: result: %d %d\n",result, WSAGetLastError());
+            closesocket(client);
             WSACleanup();
             break;
         }
@@ -226,10 +223,10 @@ DWORD WINAPI user_connected(LPVOID lpParam)
     } while (result >= 0);
 
     // shutdown the connection since we're done
-    result = shutdown(*client, SD_SEND);
+    result = shutdown(client, SD_SEND);
     if (result == SOCKET_ERROR) {
         printf("shutdown failed with error: %d\n", WSAGetLastError());
-        closesocket(*client);
+        closesocket(client);
         WSACleanup();
         return 1; 
     }
