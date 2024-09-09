@@ -6,28 +6,39 @@
 #include <stdio.h>
 #include <ws2tcpip.h>
 #include <synchapi.h>
+#include <threads.h>
 
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "4040"
-#define MAX_THREADS 1
+#define MAX_THREADS 5
+#define MAX_USERS 5
 
 DWORD WINAPI user_connected(LPVOID lpParam);
 void print_sock_addr(SOCKET s, struct sockaddr addr, int addrlen);
 
+typedef struct UserSocket {
+    SOCKET client;
+    char sendbuf[DEFAULT_BUFLEN];
+    int sendbuflen;
+    char recvbuf[DEFAULT_BUFLEN];
+    int recvbuflen;
+    char addrbuf[15];
+    int addrbuflen;
+    int threadId;
+} USERSOCKET, *PUSERSOCKET;
+
+static PUSERSOCKET  usersArray[MAX_THREADS];
+static DWORD        threadIdArray[MAX_THREADS];
+static HANDLE       handleThreadArray[MAX_THREADS];
+
 int main(void)
 {
     WSADATA wsaData;
-    int iResult;
-    int thread_size;
-
-    SOCKET ListenSocket = INVALID_SOCKET;
-
-    struct addrinfo *result = NULL;
-    struct addrinfo hints;
-
-
-
+    SOCKET  ListenSocket = INVALID_SOCKET;
+    int     iResult;
+    struct  addrinfo *result = NULL;
+    struct  addrinfo hints;
 
     // Initialize Winsock
     iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -71,7 +82,7 @@ int main(void)
 
     freeaddrinfo(result);
 
-    iResult = listen(ListenSocket, SOMAXCONN);
+    iResult = listen(ListenSocket, MAX_USERS);
     if (iResult == SOCKET_ERROR) {
         printf("listen failed with error: %d\n", WSAGetLastError());
         closesocket(ListenSocket);
@@ -80,7 +91,8 @@ int main(void)
     }
 
 
-    while (1)
+    int currentUser = 0;
+    for(currentUser; currentUser < MAX_USERS;)
     {
         SOCKET ClientSocket = INVALID_SOCKET;
         struct sockaddr addr;
@@ -88,24 +100,51 @@ int main(void)
 
         // Accept a client socket
         ClientSocket = accept(ListenSocket, &addr, &addrlen);
-        print_sock_addr(ClientSocket, &addr, &addrlen);
-        // If client socket already connected dont create a new thread
 
+        // If client socket already connected dont create a new thread
         if (ClientSocket == INVALID_SOCKET) {
             printf("accept failed with error: %d\n", WSAGetLastError());
             closesocket(ListenSocket);
             WSACleanup();
-            return 1;
+            break;
         }
-        HANDLE new_thread = CreateThread(NULL, 0, user_connected, ClientSocket, 0, NULL);
-        if (new_thread == INVALID_HANDLE_VALUE) {
-            printf("Error creating thread.\n");
+
+        usersArray[currentUser] = ((PUSERSOCKET)HeapAlloc(GetProcessHeap(),
+            HEAP_GENERATE_EXCEPTIONS,
+            sizeof(USERSOCKET))
+           );
+
+        if (usersArray[currentUser] == NULL)
+        {
+            ExitProcess(3);
+        }
+
+        usersArray[currentUser]->client = ClientSocket;
+        usersArray[currentUser]->threadId = currentUser;
+        usersArray[currentUser]->addrbuflen = sizeof(usersArray[currentUser]->addrbuf);
+        usersArray[currentUser]->sendbuflen = sizeof(usersArray[currentUser]->sendbuf);
+        usersArray[currentUser]->recvbuflen = sizeof(usersArray[currentUser]->recvbuf);
+
+        handleThreadArray[currentUser] = CreateThread(
+            NULL,
+            0,
+            user_connected,
+            usersArray[currentUser],
+            0,
+            &threadIdArray[currentUser]
+        );
+
+        if (handleThreadArray[currentUser] == NULL)
+        {
+            ExitProcess(3);
         }
         else {
-            printf("Thread created.\n");
+            currentUser++;
         }
-        
+
     }
+
+    WaitForMultipleObjects(MAX_THREADS, handleThreadArray, TRUE, INFINITE);
 
 
     // No longer need server socket
@@ -121,22 +160,20 @@ int main(void)
 
 DWORD WINAPI user_connected(LPVOID lpParam)
 {
-    
-    SOCKET *client = (SOCKET *)lpParam;
+    PUSERSOCKET pclient = (PUSERSOCKET)lpParam;
+    SOCKET *client = & pclient->client;
+    char *psendbuf = pclient->sendbuf;
+    int *psendbuflen = pclient->sendbuflen;
+    char *precvbuf = pclient->recvbuflen;
+    int *precvbuflen = pclient->recvbuflen;
+    int threadId = pclient->threadId;
+
     int result;
-
-    char sendbuf[DEFAULT_BUFLEN];
-    int sendbuflen = DEFAULT_BUFLEN;
-    char recvbuf[DEFAULT_BUFLEN];
-    int recvbuflen = DEFAULT_BUFLEN;
-    char addrbuf[DEFAULT_BUFLEN];
-    int addrbuflen = DEFAULT_BUFLEN;
-
     int sendresult;
     char *connectack = "Thanks for connecting";
-
     struct sockaddr name;
     int namelen = (int)sizeof(name);
+
 
     result = getpeername(*client, &name, &namelen);
     if (result == SOCKET_ERROR)
@@ -147,7 +184,7 @@ DWORD WINAPI user_connected(LPVOID lpParam)
         return 1;
     }
 
-    result = WSAAddressToStringW(&name, namelen, NULL, &addrbuf, addrbuflen);
+    result = WSAAddressToStringW(&name, namelen, NULL, pclient->addrbuf, pclient->addrbuflen);
     if (result == SOCKET_ERROR)
     {
         printf("string formatting failed with error: %d\n", WSAGetLastError());
@@ -156,23 +193,23 @@ DWORD WINAPI user_connected(LPVOID lpParam)
         return 1;
     }
 
-    result = snprintf(sendbuf, sendbuflen, "Connected with address: %s\n", addrbuf);
+    result = snprintf(psendbuf, *psendbuflen, "Connected with address: %s\n", pclient->addrbuf);
     if (result < 0) printf("error printing string");
 
     // Receive until the peer shuts down the connection
     do {
 
-        result = recv(*client, recvbuf, recvbuflen, 0);
+        result = recv(*client, precvbuf, *precvbuflen, 0);
         if (result > 0) {
             printf("Bytes received: %d\n", result);
 
             // Echo the buffer back to the sender
-            sendresult = send(*client, recvbuf, result, 0);
+            sendresult = send(*client, precvbuf, result, 0);
             if (sendresult == SOCKET_ERROR) {
                 printf("send failed with error: %d\n", WSAGetLastError());
                 closesocket(*client);
                 WSACleanup();
-                return 1;
+                break;
             }
             printf("Bytes sent: %d\n", sendresult);
         }
@@ -183,7 +220,7 @@ DWORD WINAPI user_connected(LPVOID lpParam)
             printf("User disconnected: %d\n", WSAGetLastError());
             closesocket(*client);
             WSACleanup();
-            return 1;
+            break;
         }
 
     } while (result >= 0);
@@ -196,6 +233,14 @@ DWORD WINAPI user_connected(LPVOID lpParam)
         WSACleanup();
         return 1; 
     }
+    CloseHandle(handleThreadArray[threadId]);
+    if (usersArray[threadId] != NULL)
+    {
+        HeapFree(GetProcessHeap(), 0, usersArray[threadId]);
+        usersArray[threadId] = NULL;
+    }
+
+
 }
 
 
