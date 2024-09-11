@@ -89,57 +89,61 @@ int main(void)
     }
 
 
-    int currentUser = 0;
-    for(currentUser; currentUser < MAX_USERS;)
+    while (1)
     {
-        SOCKET ClientSocket = INVALID_SOCKET;
-        SOCKADDR_STORAGE addr;
-        int addrlen = (int)sizeof(addr);
-
-        // Accept a client socket
-        ClientSocket = accept(ListenSocket, &addr, &addrlen);
-
-        // If client socket already connected dont create a new thread
-        if (ClientSocket == INVALID_SOCKET) {
-            printf("accept failed with error: %d\n", WSAGetLastError());
-            closesocket(ListenSocket);
-            WSACleanup();
-            break;
-        }
-
-        usersArray[currentUser] = ((PUSERSOCKET)HeapAlloc(GetProcessHeap(),
-            HEAP_GENERATE_EXCEPTIONS,
-            sizeof(USERSOCKET))
-           );
-
-        if (usersArray[currentUser] == NULL)
+        int currentUser = 0;
+        for (currentUser; currentUser < MAX_USERS;)
         {
-            ExitProcess(3);
+            SOCKET ClientSocket = INVALID_SOCKET;
+            SOCKADDR_STORAGE addr;
+            int addrlen = (int)sizeof(addr);
+
+            // Accept a client socket
+            ClientSocket = accept(ListenSocket, &addr, &addrlen);
+
+            // If client socket already connected dont create a new thread
+            if (ClientSocket == INVALID_SOCKET) {
+                printf("accept failed with error: %d\n", WSAGetLastError());
+                closesocket(ListenSocket);
+                WSACleanup();
+                break;
+            }
+
+            usersArray[currentUser] = ((PUSERSOCKET)HeapAlloc(GetProcessHeap(),
+                HEAP_GENERATE_EXCEPTIONS,
+                sizeof(USERSOCKET))
+                );
+
+            if (usersArray[currentUser] == NULL)
+            {
+                ExitProcess(3);
+            }
+
+            usersArray[currentUser]->client = ClientSocket;
+            usersArray[currentUser]->threadId = currentUser;
+            usersArray[currentUser]->sendbuflen = sizeof(usersArray[currentUser]->sendbuf);
+            usersArray[currentUser]->recvbuflen = sizeof(usersArray[currentUser]->recvbuf);
+
+            handleThreadArray[currentUser] = CreateThread(
+                NULL,
+                0,
+                user_connected,
+                usersArray[currentUser],
+                0,
+                &threadIdArray[currentUser]
+            );
+
+            if (handleThreadArray[currentUser] == NULL)
+            {
+                ExitProcess(3);
+            }
+            else {
+                currentUser++;
+            }
+
         }
-
-        usersArray[currentUser]->client = ClientSocket;
-        usersArray[currentUser]->threadId = currentUser;
-        usersArray[currentUser]->sendbuflen = sizeof(usersArray[currentUser]->sendbuf);
-        usersArray[currentUser]->recvbuflen = sizeof(usersArray[currentUser]->recvbuf);
-
-        handleThreadArray[currentUser] = CreateThread(
-            NULL,
-            0,
-            user_connected,
-            usersArray[currentUser],
-            0,
-            &threadIdArray[currentUser]
-        );
-
-        if (handleThreadArray[currentUser] == NULL)
-        {
-            ExitProcess(3);
-        }
-        else {
-            currentUser++;
-        }
-
     }
+    
 
     WaitForMultipleObjects(MAX_THREADS, handleThreadArray, TRUE, INFINITE);
 
@@ -201,7 +205,7 @@ DWORD WINAPI user_connected(LPVOID lpParam)
             printf("Bytes received: %d\n", result);
 
             // Echo the buffer back to the sender
-            sendresult = send(client, psendbuf, psendbuflen, 0);
+            sendresult = send(client, precvbuf, precvbuflen, 0);
             if (sendresult == SOCKET_ERROR) {
                 printf("send failed with error: %d\n", WSAGetLastError());
                 closesocket(client);
