@@ -43,6 +43,8 @@ int __cdecl main(void)
     int iSendResult;
     char recvbuf[DEFAULT_BUFLEN];
     int recvbuflen = DEFAULT_BUFLEN;
+    char sendbuf[DEFAULT_BUFLEN];
+    int sendbuflen = DEFAULT_BUFLEN;
 
     // Initialize Winsock
     iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -97,6 +99,11 @@ int __cdecl main(void)
 
 
     // Accept a client socket
+    struct sockaddr client_addr = { 0 };
+    int addr_len = sizeof(client_addr);
+    char addrbuf[DEFAULT_BUFLEN];
+    int addrbuflen = DEFAULT_BUFLEN;
+
     ClientSocket = accept(ListenSocket, NULL, NULL);
     if (ClientSocket == INVALID_SOCKET) {
         printf("accept failed with error: %d\n", WSAGetLastError());
@@ -105,8 +112,32 @@ int __cdecl main(void)
         return 1;
     }
 
-    // No longer need server socket
-    closesocket(ListenSocket);
+    iResult = getpeername(ClientSocket, &client_addr, &addr_len);
+    if (iResult == SOCKET_ERROR)
+    {
+        printf("peername failed with error: %d\n", WSAGetLastError());
+        closesocket(ListenSocket);
+        WSACleanup();
+        return 1;
+    }
+
+    iResult = WSAAddressToStringA(&client_addr, addr_len, NULL, &addrbuf, addrbuflen);
+    if (iResult == SOCKET_ERROR)
+    {
+        printf("string formatting failed with error: %d\n", WSAGetLastError());
+        closesocket(ListenSocket);
+        WSACleanup();
+        return 1;
+    }
+
+    iResult = snprintf(sendbuf, sendbuflen, "User connected with address: %s", addrbuf);
+    if (iResult <= 0)
+    {
+        printf("snprintf formatting failed with error: %d\n", WSAGetLastError());
+        closesocket(ListenSocket);
+        WSACleanup();
+        return 1;
+    }
 
     // Receive until the peer shuts down the connection
     do {
@@ -116,7 +147,7 @@ int __cdecl main(void)
             printf("Bytes received: %d\n", iResult);
 
             // Echo the buffer back to the sender
-            iSendResult = send(ClientSocket, recvbuf, iResult, 0);
+            iSendResult = send(ClientSocket, sendbuf, sendbuflen, 0);
             if (iSendResult == SOCKET_ERROR) {
                 printf("send failed with error: %d\n", WSAGetLastError());
                 closesocket(ClientSocket);
@@ -145,8 +176,12 @@ int __cdecl main(void)
         return 1;
     }
 
+
+
     // cleanup
     closesocket(ClientSocket);
+    // No longer need server socket
+    closesocket(ListenSocket);
     WSACleanup();
 
     return 0;
