@@ -112,39 +112,39 @@ int __cdecl main(void)
         return 1;
     }
 
-    iResult = getpeername(ClientSocket, &client_addr, &addr_len);
-    if (iResult == SOCKET_ERROR)
-    {
-        printf("peername failed with error: %d\n", WSAGetLastError());
-        closesocket(ListenSocket);
-        WSACleanup();
-        return 1;
-    }
-
-    iResult = WSAAddressToStringA(&client_addr, addr_len, NULL, &addrbuf, addrbuflen);
-    if (iResult == SOCKET_ERROR)
-    {
-        printf("string formatting failed with error: %d\n", WSAGetLastError());
-        closesocket(ListenSocket);
-        WSACleanup();
-        return 1;
-    }
-
-    iResult = snprintf(sendbuf, sendbuflen, "User connected with address: %s", addrbuf);
-    if (iResult <= 0)
-    {
-        printf("snprintf formatting failed with error: %d\n", WSAGetLastError());
-        closesocket(ListenSocket);
-        WSACleanup();
-        return 1;
-    }
-
     // Receive until the peer shuts down the connection
     do {
 
         iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
         if (iResult > 0) {
+
             printf("Bytes received: %d\n", iResult);
+            iResult = getpeername(ClientSocket, &client_addr, &addr_len);
+            if (iResult == SOCKET_ERROR)
+            {
+                printf("peername failed with error: %d\n", WSAGetLastError());
+                closesocket(ListenSocket);
+                WSACleanup();
+                return 1;
+            }
+
+            iResult = WSAAddressToStringW(&client_addr, addr_len, NULL, &addrbuf, addrbuflen);
+            if (iResult == SOCKET_ERROR)
+            {
+                printf("string formatting failed with error: %d\n", WSAGetLastError());
+                closesocket(ListenSocket);
+                WSACleanup();
+                return 1;
+            }
+
+            iResult = snprintf(sendbuf, sendbuflen, "User connected with address: %s", addrbuf);
+            if (iResult <= 0)
+            {
+                printf("snprintf formatting failed with error: %d\n", WSAGetLastError());
+                closesocket(ListenSocket);
+                WSACleanup();
+                return 1;
+            }
 
             // Echo the buffer back to the sender
             iSendResult = send(ClientSocket, sendbuf, sendbuflen, 0);
@@ -157,7 +157,7 @@ int __cdecl main(void)
             printf("Bytes sent: %d\n", iSendResult);
         }
         else if (iResult == 0)
-            printf("Connection closing...\n");
+            printf("Waiting...\n");
         else {
             printf("recv failed with error: %d\n", WSAGetLastError());
             closesocket(ClientSocket);
@@ -165,7 +165,7 @@ int __cdecl main(void)
             return 1;
         }
 
-    } while (iResult > 0);
+    } while (iResult >= 0);
 
     // shutdown the connection since we're done
     iResult = shutdown(ClientSocket, SD_SEND);
