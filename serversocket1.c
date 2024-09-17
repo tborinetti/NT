@@ -99,7 +99,8 @@ int __cdecl main(void)
 
 
     // Accept a client socket
-    struct sockaddr client_addr = { 0 };
+    struct sockaddr_in client_addr = { 0 };
+    struct sockaddr_in* clientp = &client_addr;
     int addr_len = sizeof(client_addr);
     char addrbuf[DEFAULT_BUFLEN];
     int addrbuflen = DEFAULT_BUFLEN;
@@ -111,41 +112,45 @@ int __cdecl main(void)
         WSACleanup();
         return 1;
     }
+    int testresult = 0;
 
+    testresult = getpeername(ClientSocket, &client_addr, &addr_len);
+    if (testresult == SOCKET_ERROR)
+    {
+        printf("peername failed with error: %d\n", WSAGetLastError());
+        closesocket(ListenSocket);
+        WSACleanup();
+        return 1;
+    }
+
+    const struct in_addr* clientin_addr = &client_addr.sin_addr;
+    addr_len = sizeof(addrbuf);
+    testresult = inet_ntop(AF_INET, (const void*)clientin_addr, addrbuf, addr_len);
+
+    if (testresult == SOCKET_ERROR)
+    {
+        printf("string formatting failed with error: %d\n", WSAGetLastError());
+        closesocket(ListenSocket);
+        WSACleanup();
+        return 1;
+    }
+
+    testresult = snprintf(sendbuf, sendbuflen, "You are connected with address: %s", addrbuf);
+    if (testresult <= 0)
+    {
+        printf("snprintf formatting failed with error: %d\n", WSAGetLastError());
+        closesocket(ListenSocket);
+        WSACleanup();
+        return 1;
+    }
     // Receive until the peer shuts down the connection
     do {
 
         iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
         if (iResult > 0) {
-
+            recvbuf[iResult] = '\0';
             printf("Bytes received: %d\n", iResult);
-            iResult = getpeername(ClientSocket, &client_addr, &addr_len);
-            if (iResult == SOCKET_ERROR)
-            {
-                printf("peername failed with error: %d\n", WSAGetLastError());
-                closesocket(ListenSocket);
-                WSACleanup();
-                return 1;
-            }
-
-            iResult = WSAAddressToStringW(&client_addr, addr_len, NULL, &addrbuf, addrbuflen);
-            if (iResult == SOCKET_ERROR)
-            {
-                printf("string formatting failed with error: %d\n", WSAGetLastError());
-                closesocket(ListenSocket);
-                WSACleanup();
-                return 1;
-            }
-
-            iResult = snprintf(sendbuf, sendbuflen, "User connected with address: %s", addrbuf);
-            if (iResult <= 0)
-            {
-                printf("snprintf formatting failed with error: %d\n", WSAGetLastError());
-                closesocket(ListenSocket);
-                WSACleanup();
-                return 1;
-            }
-
+            printf("Data: %s\n", recvbuf);
             // Echo the buffer back to the sender
             iSendResult = send(ClientSocket, sendbuf, sendbuflen, 0);
             if (iSendResult == SOCKET_ERROR) {
