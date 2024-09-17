@@ -15,6 +15,7 @@
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_SERVER_PORT "4040"
+#define DEFAULT_SERVER_ADDRESS "61.68.68.165"
 
 void server_connected(SOCKET server_socket);
 
@@ -29,10 +30,14 @@ int __cdecl main(int argc, char **argv)
     int iResult;
 
     // Validate the parameters
-    if (argc != 2) {
-        printf("usage: %s server-name\n", argv[0]);
-        return 1;
-    }
+    //if (argc != 2) {
+    //    printf("usage: %s server-name\n", argv[0]);
+    //    return 1;
+    //}
+
+
+
+
 
     // Initialize Winsock
     iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -47,7 +52,7 @@ int __cdecl main(int argc, char **argv)
     hints.ai_protocol = IPPROTO_TCP;
 
     // Resolve the server address and port
-    iResult = getaddrinfo(argv[1], DEFAULT_SERVER_PORT, &hints, &result);
+    iResult = getaddrinfo(DEFAULT_SERVER_ADDRESS, DEFAULT_SERVER_PORT, &hints, &result);
     if (iResult != 0) {
         printf("getaddrinfo failed with error: %d\n", iResult);
         WSACleanup();
@@ -111,28 +116,7 @@ void server_connected(SOCKET server_socket)
     struct sockaddr name;
     int namelen = (int)sizeof(name);
 
-    result = getpeername(server_socket, &name, &namelen);
-    if (result == SOCKET_ERROR)
-    {
-        printf("peername failed with error: %d\n", WSAGetLastError());
-        closesocket(*server);
-        WSACleanup();
-        return;
-    }
-    result = WSAAddressToStringW(&name, namelen, NULL, &addrbuf, addrbuflen);
-    if (result == SOCKET_ERROR)
-    {
-        printf("string formatting failed with error: %d\n", WSAGetLastError());
-        closesocket(*server);
-        WSACleanup();
-        return;
-    }
 
-    result = snprintf(sendbuf, sendbuflen, "Connected with address: %s\n", addrbuf);
-    if (result < 0) printf("error printing string");
-
-
-    printf("Server connected %s\n", sendbuf);
     // Send an initial buffer
     result = send(*server, joinmsg, (int)strlen(joinmsg), 0);
     if (result == SOCKET_ERROR) {
@@ -150,7 +134,7 @@ void server_connected(SOCKET server_socket)
         {
             printf("Bytes received: %d\n", result);
             printf("Data: %s", recvbuf);
-            sendresult = send(*server, sendbuf, sendbuflen, 0);
+            sendresult = send(*server, recvbuf, recvbuflen, 0);
             if (sendresult == SOCKET_ERROR) {
                 printf("send failed with error: %d\n", WSAGetLastError());
                 closesocket(*server);
@@ -158,7 +142,6 @@ void server_connected(SOCKET server_socket)
                 return;
             }
         }
-
         else if (result == 0)
             printf("Waiting for data\n");
         else
