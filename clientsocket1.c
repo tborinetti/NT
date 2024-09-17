@@ -14,7 +14,8 @@
 
 
 #define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT "27015"
+#define DEFAULT_PORT "4040"
+#define DEBUG_ADDR "110.174.133.54"
 
 
 
@@ -29,15 +30,15 @@ int __cdecl main(int argc, char **argv)
         hints;
     int iResult;
 
-    const char *sendbuf = "this is a test";
+    const char *connected_msg = "I am connected";
     char recvbuf[DEFAULT_BUFLEN];
     int recvbuflen = DEFAULT_BUFLEN;
 
     // Validate the parameters
-    if (argc != 2) {
-        printf("usage: %s server-name\n", argv[0]);
-        return 1;
-    }
+    //if (argc != 2) {
+    //    printf("usage: %s server-name\n", argv[0]);
+    //    return 1;
+    //}
 
     // Initialize Winsock
     iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -52,7 +53,7 @@ int __cdecl main(int argc, char **argv)
     hints.ai_protocol = IPPROTO_TCP;
 
     // Resolve the server address and port
-    iResult = getaddrinfo(argv[1], DEFAULT_PORT, &hints, &result);
+    iResult = getaddrinfo(DEBUG_ADDR, DEFAULT_PORT, &hints, &result);
     if (iResult != 0) {
         printf("getaddrinfo failed with error: %d\n", iResult);
         WSACleanup();
@@ -90,7 +91,7 @@ int __cdecl main(int argc, char **argv)
     }
 
     // Send an initial buffer
-    iResult = send(ConnectSocket, sendbuf, (int)strlen(sendbuf), 0);
+    iResult = send(ConnectSocket, connected_msg, (int)strlen(connected_msg), 0);
     if (iResult == SOCKET_ERROR) {
         printf("send failed with error: %d\n", WSAGetLastError());
         closesocket(ConnectSocket);
@@ -99,6 +100,25 @@ int __cdecl main(int argc, char **argv)
     }
 
     printf("Bytes Sent: %ld\n", iResult);
+
+
+    // Receive until the peer closes the connection
+    do {
+
+        iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
+        if (iResult > 0) {
+            printf("Bytes received: %d\n", iResult);
+            printf("Data: %s\n", recvbuf);
+        }
+        else if (iResult == 0) {
+            printf("Waiting...\n");
+        }
+        else {
+            printf("recv failed with error: %d\n", WSAGetLastError());
+        }
+            
+
+    } while (iResult >= 0);
 
     // shutdown the connection since no more data will be sent
     iResult = shutdown(ConnectSocket, SD_SEND);
@@ -109,18 +129,6 @@ int __cdecl main(int argc, char **argv)
         return 1;
     }
 
-    // Receive until the peer closes the connection
-    do {
-
-        iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
-        if (iResult > 0)
-            printf("Bytes received: %d\n", iResult);
-        else if (iResult == 0)
-            printf("Connection closed\n");
-        else
-            printf("recv failed with error: %d\n", WSAGetLastError());
-
-    } while (iResult > 0);
 
     // cleanup
     closesocket(ConnectSocket);

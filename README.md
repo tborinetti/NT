@@ -46,3 +46,6 @@ Dude add to this where I'm missing stuff because I 100% am
 - server on a raspberry pi ?? running sqlite containing usernames and current IP address ? maybe an active status too
 
 - multiple threads for maintaining connection, waiting for message streams (c11 needed )
+
+***
+### TO DEBUG COMMAND LINE: PROJECT/LINKER/SYSTEM/SUBSYSTEM CONSOLE!!!!!!!!
